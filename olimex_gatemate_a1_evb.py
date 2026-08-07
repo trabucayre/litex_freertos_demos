@@ -69,6 +69,7 @@ class BaseSoC(SoCCore):
         remote_ip           = None,
         eth_dynamic_ip      = False,
         with_pwm            = False,
+        with_spi            = False,
         with_led_chaser     = True,
         **kwargs):
         platform = olimex_gatemate_a1_evb.Platform(toolchain)
@@ -125,10 +126,32 @@ class BaseSoC(SoCCore):
         # PWM --------------------------------------------------------------------------------------
         if with_pwm:
             platform.add_extension([
-                ("pwm", 0, Pins("bank_misc1:4")),
+                # ("pwm", 0, Pins("bank_misc1:4")),
+                ("pwm", 0, Pins("PMOD:0")),
             ])
             pwm_pads = platform.request("pwm")
             self.pwm = PWM(pwm_pads)
+
+        if with_spi:
+            from litex.build.generic_platform import Subsignal, IOStandard
+            from litex.soc.cores.spi import SPIMaster
+            _spi_extension = [ ("spi", 0,
+        Subsignal("clk",  Pins("PMOD:1")),
+        Subsignal("mosi", Pins("PMOD:2")),
+        Subsignal("miso", Pins("PMOD:3")),
+        Subsignal("cs_n", Pins("PMOD:4")),
+        )]
+
+# Register the extension with the hardware platform
+            platform.add_extension(_spi_extension)
+            spi_pads = platform.request("spi", 0)
+            self.submodules.spi = SPIMaster(
+                pads         = spi_pads,
+                data_width   = 8,
+                sys_clk_freq = sys_clk_freq,
+                spi_clk_freq = 1E6,
+                with_csr     = True
+             )
 
 # Build --------------------------------------------------------------------------------------------
 
@@ -149,6 +172,7 @@ def main():
 
     # Peripherals.
     parser.add_target_argument("--with-pwm",            action="store_true",      help="Enable PWM support.")
+    parser.add_target_argument("--with-spi",            action="store_true",      help="Enable SPI support.")
 
     args = parser.parse_args()
 
@@ -164,6 +188,7 @@ def main():
         eth_dynamic_ip      = args.eth_dynamic_ip,
         remote_ip           = args.remote_ip,
         with_pwm            = args.with_pwm,
+        with_spi            = args.with_spi,
         **parser.soc_argdict)
 
     soc.platform.add_extension(olimex_gatemate_a1_evb._pmods_io)
